@@ -1,5 +1,5 @@
 use rand::{distr::Uniform, prelude::*};
-use rusty_engine::prelude::{bevy::sprite::Sprite, *};
+use rusty_engine::prelude::*;
 
 #[derive(Resource)]
 struct GameState {
@@ -26,6 +26,9 @@ fn main() {
 
     game.audio_manager
         .play_music(MusicPreset::MysteriousMagic, 0.15);
+
+    let health_text = game.add_text("health_text", "Health: 5");
+    health_text.translation = Vec2::new(550.0, 320.0);
 
     let player1 = game.add_sprite("player1", "sprite/spacerage/player_b_m.png");
     player1.translation.x = -500.0;
@@ -69,6 +72,10 @@ fn main() {
 }
 
 fn game_logic(engine: &mut Engine, game_state: &mut GameState) {
+    if game_state.lost {
+        return;
+    }
+
     let mut rng = rand::rng();
 
     let mut direction = 0.0_f32;
@@ -119,5 +126,28 @@ fn game_logic(engine: &mut Engine, game_state: &mut GameState) {
                 sprite.translation.y = rng.sample(game_state.y_values);
             }
         }
+    }
+
+    let health_text = engine.texts.get_mut("health_text").unwrap();
+    for event in engine.collision_events.drain(..) {
+        if !event.pair.either_contains("player") || event.state.is_end() {
+            continue;
+        }
+        if game_state.health_amount > 0 {
+            game_state.health_amount -= 1;
+            health_text.value = format!("Health: {}", game_state.health_amount);
+            engine.audio_manager.play_sfx(SfxPreset::Impact3, 0.5);
+        }
+        if game_state.health_amount == 0 {
+            break;
+        }
+    }
+
+    if game_state.health_amount == 0 {
+        game_state.lost = true;
+        let game_over_text = engine.add_text("game_over", "GAME OVER");
+        game_over_text.font_size = 128.0;
+        engine.audio_manager.stop_music();
+        engine.audio_manager.play_sfx(SfxPreset::Jingle3, 0.5);
     }
 }
